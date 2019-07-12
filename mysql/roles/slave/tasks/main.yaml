@@ -1,0 +1,47 @@
+- name: Load master data to slave 
+  mysql_db:
+    login_user: "root"
+    login_password: "{{ db_pass }}"
+    login_unix_socket: "{{db_workdir}}/mysql/tmp/mysql.sock"
+    name: "all"
+    target: "/tmp/all.sql"
+    state: import
+
+- name: Search master replication status 
+  shell: "awk -F'TO' 'NR==31' /tmp/bak.sql | awk  -F'TO' '{print $2}'"
+  register: offset_data 
+
+- name: Update slave db config server_id 
+  replace:
+    dest: "/etc/my.cnf"
+    regexp: "server-id = 98"
+    replace: "server-id = 99"
+  register: server_id
+
+- name: Restart mysql 
+  systemd:
+    name: mysqld
+    state: restarted
+  when: server_id is succeeded
+
+- name: Change master replication 
+  vars:
+    master: "{{ groups['master'][0] }}"
+  mysql_replication:
+    mode: changemaster
+    login_user: root
+    login_password: "{{ db_pass }}"
+    login_unix_socket: "{{db_workdir}}/mysql/tmp/mysql.sock"
+    master_host: "{{ master }}"
+    master_log_file: mybinlog.000001
+    master_user: "{{ replication_user }}"
+    master_password: "{{ db_pass }}"
+    master_log_pos: 4
+  when: offset_data is succeeded
+
+- name: Start slave 
+  mysql_replication:
+    login_user: root 
+    login_password: "{{ db_pass }}"
+    login_unix_socket: "{{ db_workdir }}/mysql/tmp/mysql.sock"
+    mode: startslave

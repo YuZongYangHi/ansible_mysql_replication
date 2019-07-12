@@ -1,0 +1,95 @@
+---
+- name: Create repo backup directory
+  file:
+    path: /opt/repo_bak
+    state: directory 
+
+- name: Move repo to backuo directory 
+  shell: "mv /etc/yum.repos.d/* /opt/repo_bak" 
+  ignore_errors: true 
+
+- name: Download percona repo 
+  unarchive:
+    src: "{{ db_repo_url }}"
+    dest: /etc/yum.repos.d/
+    copy: no
+  when: private_single == "no"
+
+- name: Purge yum cache 
+  shell: "yum clean all && yum makecache"
+
+- name: Init db directory 
+  file:
+    path: "{{ db_workdir }}/mysql/{{ item }}"
+    state: directory
+  with_items:
+    - logs
+    - data 
+    - tmp 
+
+- name: Install db relation package 
+  yum:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+    disable_gpg_check: yes
+  with_items:
+    - { name: 'sshpass', state: 'latest'}  
+    - { name: 'mariadb*', state: 'absent' } 
+    - { name: 'Percona-Server-server-57', state: 'latest' }
+    - { name: 'python-pip', state: 'latest' }
+    - { name: 'python-devel', state: 'latest' }
+    - { name: 'gcc', state: 'latest' }
+    - { name: 'gcc-c++', state: 'latest' }
+    - { name: 'python-mysqldb', state: 'latest' }
+    - { name: 'mysqlclient', state: 'latest' }
+    - { name: 'python-mysqldb', state: 'latest' }
+
+- name: Copy db configure file 
+  template:
+    src: mysqld.cnf.j2
+    dest: "/etc/percona-server.conf.d/mysqld.cnf"
+
+- name: Change db file mode 
+  file:
+    dest: "{{ db_workdir }}/mysql/"
+    owner: mysql 
+    group: mysql
+    recurse: yes 
+
+- name: Config db configure file 
+  shell: 'test -f /etc/my.cnf && mv /etc/my.cnf /etc/my.cnf.bak && ln -s /etc/percona-server.conf.d/mysqld.cnf /etc/my.cnf'
+  notify:
+    - Start mysql 
+
+- name: Get db default password 
+  shell: grep "temporary password" '{{ db_workdir }}'/mysql/logs/mysql.log | awk '{print $NF}'
+  register: default_password 
+
+- name: Reset db password
+  shell: 'mysql -uroot -p"{{ item }}" -e "set password = password("{{ db_pass }}");" --connect-expired-password'
+  when: default_password is succeeded
+  with_items:
+    - "{{ default_password.stdout }}"
+
+- name: Install python required package 
+  pip:
+    name: "{{ item }}"
+    state: present 
+  with_items:
+    - pymysql
+
+- name: Grant user privileges 
+  mysql_db:
+    login_host: 
+    login_user: ''
+    login_password: ''
+    login_port: 3306
+    name: ''
+    host: ''
+    priv: ''
+    password: ;;
+    state: present 
+      
+
+# replication 
+

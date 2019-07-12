@@ -1,0 +1,21 @@
+- name: Install MySQL Server
+  hosts: all
+  vars_files:
+    - /opt/mysql/group_vars/config.yaml
+  roles: 
+    - server 
+
+- name: Deployment MySQL Server 
+  hosts: master 
+  vars_files:
+    - /opt/mysql/group_vars/config.yaml
+  roles: 
+    - master 
+
+- name: Configure MySQL Replication 
+  hosts: slave
+  vars_files:
+    - /opt/mysql/group_vars/config.yaml
+  roles:
+    - slave 
+

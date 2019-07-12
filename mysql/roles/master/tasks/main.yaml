@@ -1,0 +1,33 @@
+- name: Grant root privileges
+  vars: 
+    passwd: '"{{ db_pass }}"'
+    sql: '"root"@"%"'
+  shell: "mysql -u root -p{{ passwd }} -e 'GRANT ALL PRIVILEGES ON *.* TO {{ sql }}  IDENTIFIED BY {{ passwd }};'"
+
+- name: Grant root privileges
+  vars: 
+    passwd: '"{{ db_pass }}"'
+    sql: '"{{ replication_user }}"@"%"'
+  shell: "mysql -u root -p{{ passwd }} -e 'grant replication slave ON *.* TO {{ sql }}  IDENTIFIED BY {{ passwd }};'"
+
+- name: Dump current all data to /tmp directory 
+  mysql_db:
+    login_user: "root"
+    login_password: "{{ db_pass }}"
+    login_unix_socket: "{{ db_workdir }}/mysql/tmp/mysql.sock"
+    name: "all"
+    target: "/tmp/all.sql"
+    state: "dump"
+  register: dump_res 
+
+- name: Copy remote host to local 
+  fetch:
+    src: /tmp/all.sql
+    dest: /tmp/
+    flat: 'yes'
+
+- name: Copy master all data to slave server 
+  copy:
+    src: /tmp/all.sql 
+    dest: /tmp/all.sql 
+  when: dump_res is succeeded

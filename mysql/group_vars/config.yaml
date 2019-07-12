@@ -1,0 +1,17 @@
+# 如果是私有, 请将下面参数设置为true，并且自行配置repo
+db_repo_url: "http://mirrors.hobot.cc/centos/DB-repo.tar.gz"
+
+# 当前安装主从的机器是否是私有云(yes/no)
+private_single: "no"
+
+# 默认数据库密码
+db_pass: "Y#*dUjC9%U%j"
+
+# 主从复制中id
+server_id: 98
+
+# db workdir 
+db_workdir: /data
+
+# replication replication
+replication_user: repl
